@@ -7,7 +7,55 @@ The [R plugin](https://www.jetbrains.com/help/pycharm/r-plugin-support.html) for
 handy capabilities to work with the [R Markdown](https://www.jetbrains.com/help/pycharm/r-markdown.html) files.
 To [add](https://www.jetbrains.com/help/pycharm/r-markdown.html#add-code-chunk) a new R chunk,
 ```{r}
+library(tidyverse)
+# contains:
+# ggplot2: For data visualization.
+# dplyr: For data manipulation.
+# tidyr: For data tidying.
+# readr: For data import.
+# purrr: For functional programming.
+# tibble: For tibbles, a modern re-imagining of data frames.
+# stringr: For string manipulation.
+# forcats: For working with factors.
+#
+```
+```{r}
+data <- read_csv("savant_data.csv",
+                 col_select = c(
+                         "pitch_type",
+                         "release_speed",
+                         # "release_pos_x", "release_pos_z",
+                         "release_extension",
+                         "release_spin_rate", "pfx_x", "pfx_z", "p_throws",
+                         # "spin_axis",
+                         "delta_run_exp"
+                    )
+                 )
+names(data)[1] <- "pitch_type"
 
+y <- data$delta_run_exp
+# select the columns of interest
+X <- data[, names(data) != "delta_run_exp"]
+colnames(X)
+```
+```{r}
+# Create dummy variables for p_throws and pitch_type if not already present
+data <- data %>%
+    mutate(pitch_type = case_when(
+           pitch_type %in% c("FF", "SI", "FC") ~ "fastball",
+           pitch_type %in% c("SL", "ST", "SV", "CU", "KC", "CS", "KN") ~ "breaking",
+           pitch_type %in% c("CH", "FS", "FO", "SC") ~ "offspeed",
+           TRUE ~ NULL
+          )) %>%
+    filter(!is.null(pitch_type))
+```
+```{r}
+dummies <- dummyVars(~ p_throws + pitch_type, data = data)
+one_hot_encoded_data <- predict(dummies, newdata = X)
+
+one_hot_encoded_data <- as.data.frame(one_hot_encoded_data)
+X <- data[, !names(data) %in% c("p_throws", "pitch_type")]
+X <- cbind(X, one_hot_encoded_data)
 ```
 position the caret at any line or the code chunk, then click "+".
 
@@ -17,8 +65,7 @@ The code chunk appears:
 
 Type any R code in the chunk, for example:
 ```{r}
-mycars <- within(mtcars, { cyl <- ordered(cyl) })
-mycars
+summary(lm(y ~ ., data = X))
 ```
 
 Now, click the **Run** button on the chunk toolbar to [execute](https://www.jetbrains.com/help/pycharm/r-markdown.html#run-r-code) the chunk code. The result should be placed under the chunk.
