@@ -5,6 +5,7 @@ Repo for the STA302H1F24 course.
 There are still some things we need to do in Main.R:
 - [ ]: Do work for left-handed pitchers (or decide not to do them)
 - [ ]: Decide if we should get rid of the filtering in task 4
+  - Maybe talk about outliers in the report?
 - [ ]: Complete task 3 & 6
 	- Confirm the comments in task 3
 - [ ]: Convert the R file into RMD file
