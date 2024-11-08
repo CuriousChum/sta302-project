@@ -186,10 +186,21 @@ summary(Final_lm_weighted) # R^2: 0.3937  p_value: < 2.2e-16
 
 # Plot 
 ggplot(Final, aes(x = est_whiff, y = whiff)) +
-  geom_point() + 
-  geom_abline(slope = 1) # y = x
-
-
+  geom_point(color = "blue", alpha = 0.6, size = 2) +  # Adjust color, transparency, and size of points
+  geom_abline(intercept = 0, slope = 1, linetype = "solid", color = "black") +  # y = x line for reference
+  labs(
+    title = "Predicted vs Actual Whiff Rate for Pitchers",
+    x = "Estimated Whiff Rate (Predicted)",
+    y = "Actual Whiff Rate"
+  ) +
+  theme_minimal(base_size = 15) +  # Clean theme with larger font size
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),  # Center and bold the title
+    axis.title.x = element_text(margin = margin(t = 10)),   # Add spacing around axis titles
+    axis.title.y = element_text(margin = margin(r = 10)),
+    panel.grid.major = element_line(color = "grey90"),      # Lighten grid lines for cleaner look
+    panel.grid.minor = element_blank()                      # Remove minor grid lines
+  )
 
 
 
