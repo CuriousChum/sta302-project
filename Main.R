@@ -13,7 +13,7 @@ library(dplyr)
 library(mgcv)
 
 # Object savant_data comes from HowToSavantData.R
-
+# source("HowToSavantData.R", echo = TRUE, print.eval = TRUE)
 
 ################################################################################
 # TASK 1: Clean the data
@@ -163,7 +163,6 @@ Final <- Predict_RHP_FB0 |>
             whiff = mean(whiff),
             est_whiff = mean(est_whiff)) |>
   filter(count > 50) # Filter pitchers with too few results (many 0's)
-remove(Predict_RHP_FB0) # Clean
 
 
 ################################################################################
@@ -202,5 +201,37 @@ ggplot(Final, aes(x = est_whiff, y = whiff)) +
     panel.grid.minor = element_blank()                      # Remove minor grid lines
   )
 
+# Q-Q Plot
+e_hat = resid(Final_lm_weighted)
+qqnorm(e_hat)
+qqline(e_hat)
 
+# # Pairs
+# summary(Predict_RHP_FB0)
+# selected_columns <- c("release_speed", 
+#                       "release_extension", "release_pos_z", "plate_z", 
+#                       "plate_x", "ax", "az") # Exclude stand & strikes as they are categorical
+# 
+# # Creating a pairs plot with the selected columns using the correct data.table syntax
+# pairs(Predict_RHP_FB0[, ..selected_columns])
+
+
+# # Residual vs fitted
+# y_hat = fitted(Final_lm_weighted)
+# plot(y_hat, e_hat, main="Residuals vs Fitted", xlab="Fitted", ylab="Residuals")
+# 
+# # Residuals vs Numerical Predictors
+# plot(Predict_RHP_FB0$release_speed, e_hat, main="Residuals vs release_speed", xlab="release_speed", ylab="Residuals")
+# plot(Predict_RHP_FB0$release_extension, e_hat, main="Residuals vs release_extension", xlab="release_extension", ylab="Residuals")
+# plot(Predict_RHP_FB0$release_pos_z, e_hat, main="Residuals vs release_pos_z", xlab="release_pos_z", ylab="Residuals")
+# plot(Predict_RHP_FB0$plate_z, e_hat, main="Residuals vs plate_z", xlab="plate_z", ylab="Residuals")
+# plot(Predict_RHP_FB0$plate_x, e_hat, main="Residuals vs plate_x", xlab="plate_x", ylab="Residuals")
+# plot(Predict_RHP_FB0$ax, e_hat, main="Residuals vs ax", xlab="ax", ylab="Residuals")
+# plot(Predict_RHP_FB0$az, e_hat, main="Residuals vs az", xlab="az", ylab="Residuals")
+# 
+# # boxplot of residuals vs Categorical Predictors
+# boxplot(e_hat ~ Predict_RHP_FB0$stand, main="Residuals by Stand", xlab="Stand", ylab="Residuals",
+#         names=c("R", "L"))
+# boxplot(e_hat ~ Predict_RHP_FB0$strikes, main="Residuals by Stand", xlab="Stand", ylab="Residuals",
+#         names=c("0", "1", "2"))
 
