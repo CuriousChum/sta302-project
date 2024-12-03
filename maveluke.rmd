@@ -10,14 +10,68 @@ position the caret at any line or the code chunk, then click "+".
 
 The code chunk appears:
 ```{r}
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+```
+
+
+```{r}
+data <- read.csv("savant_data.csv")
+colnames(data)[1] <- "pitch_type"
+# Select the columns of interest
+data <- data %>% select("pitch_type", "release_speed", "pfx_x", "pfx_z", "p_throws",
+          "release_spin_rate", "delta_run_exp")
+
+# Selecting the pitch types of interest
+data <- data %>% filter(pitch_type %in% c("FF", "SI", "FC", "CH", "FS", "FO", "SC", "CU", "KC", "CS", "SL", "ST", "SV", "KN"))
+
+
+# Check for missing values
+missing <- is.na(data$pitch_type) | is.na(data$release_speed) | is.na(data$pfx_x) | is.na(data$pfx_z) | is.na(data$p_throws) | is.na(data$release_spin_rate) | is.na(data$delta_run_exp)
+filtered_data <- subset(data, subset = !missing & data$release_speed > 65)
+
+responses <- filtered_data$delta_run_exp
+summary(responses)
+hist(responses)
+```
+```{r}
+
 
 ```
+
 
 Type any R code in the chunk, for example:
 ```{r}
-mycars <- within(mtcars, { cyl <- ordered(cyl) })
-mycars
+# Model training
+model <- lm(delta_run_exp ~ pitch_type + release_speed + pfx_x + pfx_z + p_throws + release_spin_rate, data = filtered_data)
+fitted <- fitted(model)
+residuals <- resid(model)
+
+# Plot the fitted vs residuals
+plot(residuals ~ fitted, main = "Residuals vs Fitted", xlab = "Fitted values", ylab = "Residuals")
+
+# QQ plot
+qqnorm(residuals)
+qqline(residuals)
+
+
 ```
+```{r}
+p1 <- ggplot(filtered_data, aes(x=release_speed)) + geom_histogram(binwidth=1, fill="skyblue") + theme_minimal() + ggtitle("Release Speed")
+p2 <- ggplot(filtered_data, aes(x=pfx_x)) + geom_histogram(binwidth=0.1, fill="skyblue") + theme_minimal() + ggtitle("PFX X")
+p3 <- ggplot(filtered_data, aes(x=pfx_z)) + geom_histogram(binwidth=0.1, fill="skyblue") + theme_minimal() + ggtitle("PFX Z")
+p4 <- ggplot(filtered_data, aes(x=release_spin_rate)) + geom_histogram(binwidth=50, fill="skyblue") + theme_minimal() + ggtitle("Spin Rate")
+
+p5 <- ggplot(filtered_data, aes(x=pitch_type)) + geom_bar(binwidth=10, fill="skyblue") + theme_minimal() + ggtitle("Pitch Type")
+p6 <- ggplot(filtered_data, aes(x=p_throws)) + geom_bar(fill="lightgreen") + theme_minimal() + ggtitle("P Throws")
+
+grid.arrange(p1, p2, p3, p4, p5, p6, ncol=3)
+
+# Summary of the predictors
+
+```
+
 
 Now, click the **Run** button on the chunk toolbar to [execute](https://www.jetbrains.com/help/pycharm/r-markdown.html#run-r-code) the chunk code. The result should be placed under the chunk.
 Click the **Knit and Open Document** to build and preview an output.
