@@ -51,6 +51,10 @@ We isolate the data to right-handed pitchers, as left-handed pitchers fundamenta
 
 ```{r}
 # Remove incomplete data points (NA's)
+
+transform <- function(x) {
+  return (x - mean(x)) / sd(x);
+}
 RHP_FB0 <- RHP_FB |>
   filter(
     !is.na(stand), 
@@ -60,7 +64,7 @@ RHP_FB0 <- RHP_FB |>
     !is.na(release_pos_z), 
     !is.na(release_pos_x),
     !is.na(plate_z), 
-    !is.na(plate_x), 
+    !is.na(plate_x),
     !is.na(ax), 
     !is.na(az),
     !is.na(pfx_x), 
@@ -79,9 +83,13 @@ RHP_FB0 <- RHP_FB |>
             pfx_x = mean(pfx_x),
             pfx_z = mean(pfx_z),
             whiff = mean(whiff),
-            count = n())
-
-remove(RHP_FB) # Cleanup
+            count = n(),
+            .groups="drop") |>
+     mutate(across(where(is.numeric) & !all_of("count") & !all_of("whiff"), ~ (. - min(.) + 1) / sd(.))) |>
+     filter(0.05 < whiff) |>
+     mutate(whiff = log(whiff + 0.001))
+  
+# remove(RHP_FB) # Cleanup
 ```
 
 We group by *player_name* and *game_year* as this classification leads to the most self-consistency within samples. *stand* is also included as it is a categorical variable (see below).
@@ -157,6 +165,12 @@ Description
 Description
 
 Description
+```{r}
+boxCox(fb_model)
+```
+```{r}
+hist(RHP_FB0$whiff)
+```
 
 ```{r}
 # Create Residual plots
@@ -234,7 +248,6 @@ We also observe no bias in the residuals, and no distinct skew/patterns.
 
 ```{r}
 # Residual vs Predictor plots for each predictor variable
-
 plot(RHP_FB0$release_speed, e_hat, main="Residuals vs Release Speed", xlab="Release Speed", ylab="Residuals")
 plot(RHP_FB0$release_spin_rate, e_hat, main="Residuals vs Release Spin Rate", xlab="Release Spin Rate", ylab="Residuals")
 plot(RHP_FB0$release_extension, e_hat, main="Residuals vs Release Extension", xlab="Release Extension", ylab="Residuals")
@@ -257,6 +270,10 @@ Description
 Description
 
 Description
+```{r}
+boxCox(fb_model)
+```
+
 
 ```{r}
 # Create Box Plots
