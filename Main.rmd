@@ -86,7 +86,7 @@ RHP_FB0 <- RHP_FB |>
             count = n(),
             .groups="drop") |>
      mutate(across(where(is.numeric) & !all_of("count") & !all_of("whiff"), ~ (. - min(.) + 1) / sd(.))) |>
-     filter(0.05 < whiff) |>
+     filter(162 < count) |>
      mutate(whiff = log(whiff + 0.001))
   
 # remove(RHP_FB) # Cleanup
@@ -169,6 +169,14 @@ Description
 boxCox(fb_model)
 ```
 ```{r}
+hist(RHP_FB0$whiff)
+hist(RHP_FB0$release_speed)
+hist(RHP_FB0$release_spin_rate)
+hist(RHP_FB0$release_extension)
+hist(RHP_FB0$release_pos_x)
+hist(RHP_FB0$release_pos_z)
+hist(RHP_FB0$ax)
+hist(RHP_FB0$az)
 hist(RHP_FB0$whiff)
 ```
 
