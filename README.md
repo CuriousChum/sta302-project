@@ -12,8 +12,8 @@ Make sure to also check the rubric in case we missed something.
 
 ## How to Run
 1. Run DownloadSavantData.R (if needed)
-2. Run HowToSavantData.R (can be run on Main.R)
-3. Run Main.R
+2. Run HowToSavantData.R (can be run on Main.rmd)
+3. Run Main.rmd
 
 ## Working together
 Work on your own files to prevent git conflict craziness. Try to not make changes to others' file.
