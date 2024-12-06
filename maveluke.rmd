@@ -3,75 +3,231 @@ title: "Maveluke's Code"
 output: html_notebook
 ---
 
-The [R plugin](https://www.jetbrains.com/help/pycharm/r-plugin-support.html) for IntelliJ-based IDEs provides
-handy capabilities to work with the [R Markdown](https://www.jetbrains.com/help/pycharm/r-markdown.html) files.
-To [add](https://www.jetbrains.com/help/pycharm/r-markdown.html#add-code-chunk) a new R chunk,
-position the caret at any line or the code chunk, then click "+".
-
 The code chunk appears:
 ```{r}
 library(dplyr)
 library(ggplot2)
+library(grid)
 library(gridExtra)
+library(MASS)
+# install.packages("GGally")
+library(GGally)
 ```
 
+```{r}
+# Filter data for right-handed pitchers (RHP) and four-seam fastballs (FF)
+# Filter for all swings and calculate whiff rates
+data <- savant_data |>
+  filter(p_throws == "R", pitch_type == "FF",
+        description %in% c("hit_into_play", "swinging_strike", "foul", "foul_tip")) |>
+  mutate(whiff = if_else(description == "swinging_strike", 1, 0))
+```
 
 ```{r}
-data <- read.csv("savant_data.csv")
-colnames(data)[1] <- "pitch_type"
-# Select the columns of interest
-data <- data %>% select("pitch_type", "release_speed", "pfx_x", "pfx_z", "p_throws",
-          "release_spin_rate", "delta_run_exp")
 
-# Selecting the pitch types of interest
-data <- data %>% filter(pitch_type %in% c("FF", "SI", "FC", "CH", "FS", "FO", "SC", "CU", "KC", "CS", "SL", "ST", "SV", "KN"))
+# Remove incomplete data points (NA's) and group by player_name, game_year and stand
+RHP_FB0 <- data |>
+  filter(
+    !is.na(stand), 
+    !is.na(release_speed),
+    !is.na(release_spin_rate), 
+    !is.na(release_extension),
+    !is.na(release_pos_z), 
+    !is.na(release_pos_x),
+    !is.na(plate_z), 
+    !is.na(plate_x), 
+    !is.na(ax), 
+    !is.na(az),
+    !is.na(pfx_x), 
+    !is.na(pfx_z)
+  ) |>
+  group_by(player_name, game_year, stand) |>
+  summarise(release_speed = mean(release_speed),
+            release_spin_rate = mean(release_spin_rate),
+            release_extension = mean(release_extension),
+            release_pos_x = mean(release_pos_x),
+            release_pos_z = mean(release_pos_z),
+            plate_z = mean(plate_z),
+            plate_x = mean(plate_x),
+            ax = mean(ax),
+            az = mean(az),
+            pfx_x = mean(pfx_x),
+            pfx_z = mean(pfx_z),
+            whiff = mean(whiff),
+            count = n())|>
+    filter(162 < count)
+#     mutate(whiff = whiff^(1/3)) # power value from power transformation function
 
-
-# Check for missing values
-missing <- is.na(data$pitch_type) | is.na(data$release_speed) | is.na(data$pfx_x) | is.na(data$pfx_z) | is.na(data$p_throws) | is.na(data$release_spin_rate) | is.na(data$delta_run_exp)
-filtered_data <- subset(data, subset = !missing & data$release_speed > 65)
-
-responses <- filtered_data$delta_run_exp
+responses <- filtered_data$whiff
 summary(responses)
-hist(responses)
 ```
 ```{r}
-
-
+fb_model <- lm(whiff ~ 
+                 # Predictors
+                 stand + release_speed + release_spin_rate +
+                 release_extension + release_pos_z + 
+                 release_pos_x + plate_x + plate_z + 
+                 ax + az + pfx_x + pfx_z + 
+                 # Interaction terms
+                 stand:release_pos_x + stand:ax + stand:plate_x,
+               data = RHP_FB0, weights = count)
+e_hat <- resid(fb_model)
+y_hat <- fitted(fb_model)
 ```
 
-
-Type any R code in the chunk, for example:
 ```{r}
-# Model training
-model <- lm(delta_run_exp ~ pitch_type + release_speed + pfx_x + pfx_z + p_throws + release_spin_rate, data = filtered_data)
-fitted <- fitted(model)
-residuals <- resid(model)
+theme <- theme_minimal() +
+  theme(
+    plot.title = element_text(size = 15, face = "bold", margin = margin(b = 10)),
+    axis.title = element_text(size = 12, face = "bold"),
+    axis.text = element_text(size = 11),
+    plot.margin = margin(10, 20, 10, 10),
+    panel.grid.major = element_line(color = "gray90", linewidth = 0.3),
+    panel.grid.minor = element_blank(),
+    panel.background = element_rect(fill = "white"),
+    plot.background = element_rect(fill = "white", color = NA)
+  )
 
-# Plot the fitted vs residuals
-plot(residuals ~ fitted, main = "Residuals vs Fitted", xlab = "Fitted values", ylab = "Residuals")
+# Function to create a standardized residual plot
+create_residual_plot <- function(data, x_var, x_lab, title) {
+  ggplot(data, aes(x = {{x_var}}, y = e_hat)) +
+    geom_point(alpha = 0.6, color = "#2c3e50", size = 1.5) +  
+    geom_smooth(method = "loess", se = TRUE, color = "#e74c3c", fill = "#ffcdd2", alpha = 0.2) +  
+    labs(title = title, 
+         x = x_lab, 
+         y = "Residuals") +
+    theme +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", linewidth = 0.3)
+}
 
-# QQ plot
-qqnorm(residuals)
-qqline(residuals)
+# Residuals vs Predictors
+p_resid_rs <- create_residual_plot(RHP_FB0, release_speed, "Release Speed", "Residuals vs Release Speed")
+p_resid_rsr <- create_residual_plot(RHP_FB0, release_spin_rate, "Release Spin Rate", "Residuals vs Release Spin Rate")
+p_resid_re <- create_residual_plot(RHP_FB0, release_extension, "Release Extension", "Residuals vs Release Extension")
+p_resid_rpz <- create_residual_plot(RHP_FB0, release_pos_z, "Release Pos Z", "Residuals vs Release Pos Z")
+p_resid_rpx <- create_residual_plot(RHP_FB0, release_pos_x, "Release Pos X", "Residuals vs Release Pos X")
+p_resid_pz <- create_residual_plot(RHP_FB0, plate_z, "Plate Z", "Residuals vs Plate Z")
+p_resid_px <- create_residual_plot(RHP_FB0, plate_x, "Plate X", "Residuals vs Plate X")
+p_resid_az <- create_residual_plot(RHP_FB0, az, "Az", "Residuals vs Az")
+p_resid_ax <- create_residual_plot(RHP_FB0, ax, "Ax", "Residuals vs Ax")
+p_resid_pfx_z <- create_residual_plot(RHP_FB0, pfx_z, "Pfx Z", "Residuals vs Pfx Z")
+p_resid_pfx_x <- create_residual_plot(RHP_FB0, pfx_x, "Pfx X", "Residuals vs Pfx X")
 
+# Special case for boxplot
+p_resid_s <- ggplot(data = RHP_FB0, aes(x = stand, y = e_hat)) +
+  geom_boxplot(fill = "#3498db", alpha = 0.6, outlier.color = "#e74c3c", outlier.alpha = 0.6) +
+  labs(title = "Residuals vs Stand", 
+       x = "Stand", 
+       y = "Residuals") +
+  theme +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", linewidth = 0.3)
+
+combined_plot <- arrangeGrob(
+  p_resid_rs, p_resid_rsr, p_resid_re, p_resid_rpz, 
+  p_resid_rpx, p_resid_pz, p_resid_px, p_resid_az, 
+  p_resid_ax, p_resid_pfx_z, p_resid_pfx_x, p_resid_s, 
+  ncol = 4,
+  top = textGrob("Residual Analysis Plots", 
+                 gp = gpar(fontsize = 20, fontface = "bold"))
+)
+ggsave("residual_plots.jpg", 
+       combined_plot, 
+       width = 15, 
+       height = 12, 
+       dpi = 300)
 
 ```
+
 ```{r}
-p1 <- ggplot(filtered_data, aes(x=release_speed)) + geom_histogram(binwidth=1, fill="skyblue") + theme_minimal() + ggtitle("Release Speed")
-p2 <- ggplot(filtered_data, aes(x=pfx_x)) + geom_histogram(binwidth=0.1, fill="skyblue") + theme_minimal() + ggtitle("PFX X")
-p3 <- ggplot(filtered_data, aes(x=pfx_z)) + geom_histogram(binwidth=0.1, fill="skyblue") + theme_minimal() + ggtitle("PFX Z")
-p4 <- ggplot(filtered_data, aes(x=release_spin_rate)) + geom_histogram(binwidth=50, fill="skyblue") + theme_minimal() + ggtitle("Spin Rate")
+# Response variable distribution
+p_response <- ggplot(data = data.frame(responses = responses), aes(x = responses)) +
+  geom_histogram(bins = 30, fill = "#3498db", color = "white", alpha = 0.7) +
+  labs(title = "Distribution of Response Variable",
+       x = "Response",
+       y = "Count") +
+  theme
 
-p5 <- ggplot(filtered_data, aes(x=pitch_type)) + geom_bar(binwidth=10, fill="skyblue") + theme_minimal() + ggtitle("Pitch Type")
-p6 <- ggplot(filtered_data, aes(x=p_throws)) + geom_bar(fill="lightgreen") + theme_minimal() + ggtitle("P Throws")
+ggsave("response_distribution.jpg", 
+       p_response, 
+       width = 8, 
+       height = 6, 
+       dpi = 300)
 
-grid.arrange(p1, p2, p3, p4, p5, p6, ncol=3)
+# Residuals vs fitted values
+p_resid_fitted <- ggplot(data = data.frame(fitted = y_hat, residuals = e_hat), 
+                        aes(x = fitted, y = residuals)) +
+  geom_point(alpha = 0.6, color = "#2c3e50", size = 1.5) +
+  geom_smooth(method = "loess", se = TRUE, color = "#e74c3c", fill = "#ffcdd2", alpha = 0.2) +
+  labs(title = "Residuals vs Fitted Values",
+       x = "Fitted Values",
+       y = "Residuals") +
+  theme +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", linewidth = 0.3)
 
-# Summary of the predictors
+ggsave("residuals_vs_fitted.jpg", 
+       p_resid_fitted, 
+       width = 8, 
+       height = 6, 
+       dpi = 300)
+
+# Normal Q-Q plot
+p_qq <- ggplot(data.frame(residuals = e_hat), aes(sample = residuals)) +
+  stat_qq(alpha = 0.6, color = "#2c3e50", size = 1.5) +
+  stat_qq_line(color = "#e74c3c") +
+  labs(title = "Normal Q-Q Plot",
+       x = "Theoretical Quantiles",
+       y = "Sample Quantiles") +
+  theme
+
+ggsave("qq_plot.jpg", 
+       p_qq, 
+       width = 8, 
+       height = 6, 
+       dpi = 300)
+
+predictors_df <- RHP_FB0[, c("release_speed", "release_spin_rate", "release_extension", 
+                            "release_pos_z", "release_pos_x", "plate_z", "plate_x",
+                            "az", "ax", "pfx_z", "pfx_x")]
+
+p_pairs <- ggpairs(predictors_df,
+                   lower = list(continuous = wrap("points", alpha = 0.3, size = 0.5, color = "#2c3e50")),
+                   diag = list(continuous = wrap("densityDiag", fill = "#3498db", alpha = 0.5)),
+                   upper = list(continuous = wrap("cor", size = 3))) +
+  theme
+
+ggsave("pairs_plot.jpg", 
+       p_pairs, 
+       width = 20, 
+       height = 20, 
+       dpi = 300)
 
 ```
 
 
-Now, click the **Run** button on the chunk toolbar to [execute](https://www.jetbrains.com/help/pycharm/r-markdown.html#run-r-code) the chunk code. The result should be placed under the chunk.
-Click the **Knit and Open Document** to build and preview an output.
+```{r}
+# Automate step-wise model training
+fb_model_temp <- lm(whiff ~ 1,
+               data = filtered_data, weights = count)
+fb_full_model <- lm(whiff ~ 
+                 # Predictors
+                 stand + release_speed + release_spin_rate +
+                 release_extension + release_pos_z + 
+                 release_pos_x + plate_x + plate_z + 
+                 ax + az + pfx_x + pfx_z + 
+                 # Interaction terms
+                 stand:release_pos_x + stand:ax + stand:plate_x,
+               data = filtered_data, weights = count)
+# Doing step-wise from a full model
+stepAIC(fb_full_model, 
+       direction="both", k=2)
+
+```
+
+```{r}
+stepAIC_model <- lm(formula = whiff ~ stand + release_speed + release_spin_rate + 
+    release_pos_z + release_pos_x + plate_x + plate_z + ax + 
+    az + pfx_z + stand:release_pos_x + stand:ax + stand:plate_x, 
+    data = filtered_data, weights = count)
+
+summary(stepAIC_model)
+```
