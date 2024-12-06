@@ -81,7 +81,8 @@ RHP_FB0 <- RHP_FB |>
             whiff = mean(whiff),
             count = n(),
             .groups="drop") |>
-     filter(162 < count & release_pos_z > 5)
+     filter(162 < count)
+responses <- RHP_FB0$whiff
 ```
 
 
@@ -125,30 +126,30 @@ fb_model <- lm(whiff ~
                  # Interaction terms
                  stand:release_pos_x + stand:ax + stand:plate_x,
                data = RHP_FB0, weights = count)
+e_hat <- resid(fb_model)
+y_hat <- fitted(fb_model)
 ```
 
 ## Data Visualization
 
 ```{r}
 # Response variable distribution
-p_response <- ggplot(data = data.frame(responses = responses), aes(x = responses)) +
-  geom_histogram(bins = 30, fill = "#3498db", color = "white", alpha = 0.7) +
-  labs(title = "Distribution of Response Variable",
-       x = "Response",
-       y = "Count") +
-  theme
-# We can either show the plot immediately using print or save it as an image
-print(p_response)
-# ggsave("response_distribution.jpg", 
-#        p_response, 
-#        width = 8, 
-#        height = 6, 
-#        dpi = 300)
-```
-
-```{r}
-e_hat <- resid(fb_model)
-y_hat <- fitted(fb_model)
+create_response_hist <- function(responses){
+  p_response <- ggplot(data = data.frame(responses = responses), aes(x = responses)) +
+    geom_histogram(bins = 30, fill = "#3498db", color = "white", alpha = 0.7) +
+    labs(title = "Distribution of Response Variable",
+         x = "Response",
+         y = "Count") +
+    theme
+  # We can either show the plot immediately using print or save it as an image
+  print(p_response)
+  # ggsave("response_distribution.jpg", 
+  #        p_response, 
+  #        width = 8, 
+  #        height = 6, 
+  #        dpi = 300)
+}
+create_response_hist(responses)
 ```
 
 ```{r}
@@ -166,7 +167,7 @@ theme <- theme_minimal() +
   )
 
 # Function to create a standardized residual plot
-create_residual_plot <- function(data, x_var, x_lab, title) {
+create_residual_plot <- function(data, x_var, x_lab, title, e_hat) {
   ggplot(data, aes(x = {{x_var}}, y = e_hat)) +
     geom_point(alpha = 0.6, color = "#2c3e50", size = 1.5) +  
     geom_smooth(method = "loess", se = TRUE, color = "#e74c3c", fill = "#ffcdd2", alpha = 0.2) +  
@@ -176,113 +177,126 @@ create_residual_plot <- function(data, x_var, x_lab, title) {
     theme +
     geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", linewidth = 0.3)
 }
+create_resid_vs_pred_plot <- function(dataframe, filename, e_hat){
+  # Residuals vs Predictors
+  p_resid_rs <- create_residual_plot(dataframe, release_speed, "Release Speed", "Residuals vs Release Speed", e_hat)
+  p_resid_rsr <- create_residual_plot(dataframe, release_spin_rate, "Release Spin Rate", "Residuals vs Release Spin Rate", e_hat)
+  p_resid_re <- create_residual_plot(dataframe, release_extension, "Release Extension", "Residuals vs Release Extension", e_hat)
+  p_resid_rpz <- create_residual_plot(dataframe, release_pos_z, "Release Pos Z", "Residuals vs Release Pos Z", e_hat)
+  p_resid_rpx <- create_residual_plot(dataframe, release_pos_x, "Release Pos X", "Residuals vs Release Pos X", e_hat)
+  p_resid_pz <- create_residual_plot(dataframe, plate_z, "Plate Z", "Residuals vs Plate Z", e_hat)
+  p_resid_px <- create_residual_plot(dataframe, plate_x, "Plate X", "Residuals vs Plate X", e_hat)
+  p_resid_az <- create_residual_plot(dataframe, az, "Az", "Residuals vs Az", e_hat)
+  p_resid_ax <- create_residual_plot(dataframe, ax, "Ax", "Residuals vs Ax", e_hat)
+  p_resid_pfx_z <- create_residual_plot(dataframe, pfx_z, "Pfx Z", "Residuals vs Pfx Z", e_hat)
+  p_resid_pfx_x <- create_residual_plot(dataframe, pfx_x, "Pfx X", "Residuals vs Pfx X", e_hat)
+  
+  # Special case for boxplot
+  p_resid_s <- ggplot(data = dataframe, aes(x = stand, y = e_hat)) +
+    geom_boxplot(fill = "#3498db", alpha = 0.6, outlier.color = "#e74c3c", outlier.alpha = 0.6) +
+    labs(title = "Residuals vs Stand", 
+         x = "Stand", 
+         y = "Residuals") +
+    theme +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", linewidth = 0.3)
+  
+  combined_plot <- arrangeGrob(
+    p_resid_rs, p_resid_rsr, p_resid_re, p_resid_rpz, 
+    p_resid_rpx, p_resid_pz, p_resid_px, p_resid_az, 
+    p_resid_ax, p_resid_pfx_z, p_resid_pfx_x, p_resid_s, 
+    ncol = 4,
+    top = textGrob("Residual Analysis Plots", 
+                   gp = gpar(fontsize = 20, fontface = "bold"))
+  )
+  
+  # Saved as residual_plots.jpg in the working directory
+  ggsave(filename, 
+        combined_plot, 
+        width = 15, 
+        height = 12, 
+        dpi = 300)
+}
 
-# Residuals vs Predictors
-p_resid_rs <- create_residual_plot(RHP_FB0, release_speed, "Release Speed", "Residuals vs Release Speed")
-p_resid_rsr <- create_residual_plot(RHP_FB0, release_spin_rate, "Release Spin Rate", "Residuals vs Release Spin Rate")
-p_resid_re <- create_residual_plot(RHP_FB0, release_extension, "Release Extension", "Residuals vs Release Extension")
-p_resid_rpz <- create_residual_plot(RHP_FB0, release_pos_z, "Release Pos Z", "Residuals vs Release Pos Z")
-p_resid_rpx <- create_residual_plot(RHP_FB0, release_pos_x, "Release Pos X", "Residuals vs Release Pos X")
-p_resid_pz <- create_residual_plot(RHP_FB0, plate_z, "Plate Z", "Residuals vs Plate Z")
-p_resid_px <- create_residual_plot(RHP_FB0, plate_x, "Plate X", "Residuals vs Plate X")
-p_resid_az <- create_residual_plot(RHP_FB0, az, "Az", "Residuals vs Az")
-p_resid_ax <- create_residual_plot(RHP_FB0, ax, "Ax", "Residuals vs Ax")
-p_resid_pfx_z <- create_residual_plot(RHP_FB0, pfx_z, "Pfx Z", "Residuals vs Pfx Z")
-p_resid_pfx_x <- create_residual_plot(RHP_FB0, pfx_x, "Pfx X", "Residuals vs Pfx X")
-
-# Special case for boxplot
-p_resid_s <- ggplot(data = RHP_FB0, aes(x = stand, y = e_hat)) +
-  geom_boxplot(fill = "#3498db", alpha = 0.6, outlier.color = "#e74c3c", outlier.alpha = 0.6) +
-  labs(title = "Residuals vs Stand", 
-       x = "Stand", 
-       y = "Residuals") +
-  theme +
-  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", linewidth = 0.3)
-
-combined_plot <- arrangeGrob(
-  p_resid_rs, p_resid_rsr, p_resid_re, p_resid_rpz, 
-  p_resid_rpx, p_resid_pz, p_resid_px, p_resid_az, 
-  p_resid_ax, p_resid_pfx_z, p_resid_pfx_x, p_resid_s, 
-  ncol = 4,
-  top = textGrob("Residual Analysis Plots", 
-                 gp = gpar(fontsize = 20, fontface = "bold"))
-)
-
-# Saved as residual_plots.jpg in the working directory
-ggsave("residual_plots.jpg", 
-      combined_plot, 
-      width = 15, 
-      height = 12, 
-      dpi = 300)
+create_resid_vs_pred_plot(RHP_FB0, "residual_plots_RHP.jpg", e_hat)
 
 ```
 
 ```{r}
 # Residuals vs fitted values
-p_resid_fitted <- ggplot(data = data.frame(fitted = y_hat, residuals = e_hat), 
-                        aes(x = fitted, y = residuals)) +
-  geom_point(alpha = 0.6, color = "#2c3e50", size = 1.5) +
-  geom_smooth(method = "loess", se = TRUE, color = "#e74c3c", fill = "#ffcdd2", alpha = 0.2) +
-  labs(title = "Residuals vs Fitted Values",
-       x = "Fitted Values",
-       y = "Residuals") +
-  theme +
-  geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", linewidth = 0.3)
+create_resid_fitted_plot <- function(y_hat, e_hat){
+  p_resid_fitted <- ggplot(data = data.frame(fitted = y_hat, residuals = e_hat), aes(x = fitted, y = residuals)) +
+    geom_point(alpha = 0.6, color = "#2c3e50", size = 1.5) +
+    geom_smooth(method = "loess", se = TRUE, color = "#e74c3c", fill = "#ffcdd2", alpha = 0.2) +
+    labs(title = "Residuals vs Fitted Values",
+         x = "Fitted Values",
+         y = "Residuals") +
+    theme +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "gray50", linewidth = 0.3)
+  
+  print(p_resid_fitted)
+  # ggsave("residuals_vs_fitted.jpg", 
+  #        p_resid_fitted, 
+  #        width = 8, 
+  #        height = 6, 
+  #        dpi = 300)
+}
 
-print(p_resid_fitted)
-# ggsave("residuals_vs_fitted.jpg", 
-#        p_resid_fitted, 
-#        width = 8, 
-#        height = 6, 
-#        dpi = 300)
 
 # Normal Q-Q plot
-p_qq <- ggplot(data.frame(residuals = e_hat), aes(sample = residuals)) +
-  stat_qq(alpha = 0.6, color = "#2c3e50", size = 1.5) +
-  stat_qq_line(color = "#e74c3c") +
-  labs(title = "Normal Q-Q Plot",
-       x = "Theoretical Quantiles",
-       y = "Sample Quantiles") +
-  theme
-
-print(p_qq)
-
-# gsave("qq_plot.jpg", 
-#        p_qq, 
-#        width = 8, 
-#        height = 6, 
-#        dpi = 300)
-
-predictors_df <- RHP_FB0[, c("release_speed", "release_spin_rate", "release_extension", 
-                            "release_pos_z", "release_pos_x", "plate_z", "plate_x",
-                            "az", "ax", "pfx_z", "pfx_x")]
-
-p_pairs <- ggpairs(predictors_df,
-                   lower = list(continuous = wrap("points", alpha = 0.3, size = 0.5, color = "#2c3e50")),
-                   diag = list(continuous = wrap("densityDiag", fill = "#3498db", alpha = 0.5)),
-                   upper = list(continuous = wrap("cor", size = 3))) +
-  theme
-
-print(p_pairs)
-# ggsave("pairs_plot.jpg", 
-#        p_pairs, 
-#        width = 20, 
-#        height = 20, 
-#        dpi = 300)
+create_qq_plot <- function(e_hat){
+  p_qq <- ggplot(data.frame(residuals = e_hat), aes(sample = residuals)) +
+    stat_qq(alpha = 0.6, color = "#2c3e50", size = 1.5) +
+    stat_qq_line(color = "#e74c3c") +
+    labs(title = "Normal Q-Q Plot",
+         x = "Theoretical Quantiles",
+         y = "Sample Quantiles") +
+    theme
+  
+  print(p_qq)
+  
+  # gsave("qq_plot.jpg", 
+  #        p_qq, 
+  #        width = 8, 
+  #        height = 6, 
+  #        dpi = 300)
+}
 
 
+create_pairs_plot <- function(dataframe){
+  predictors_df <- dataframe[, c("release_speed", "release_spin_rate", "release_extension", 
+                              "release_pos_z", "release_pos_x", "plate_z", "plate_x",
+                              "az", "ax", "pfx_z", "pfx_x")]
+  
+  p_pairs <- ggpairs(predictors_df,
+                    lower = list(continuous = wrap("points", alpha = 0.3, size = 0.5, color = "#2c3e50")),
+                    diag = list(continuous = wrap("densityDiag", fill = "#3498db", alpha = 0.5)),
+                    upper = list(continuous = wrap("cor", size = 3))) +
+   theme
+  
+  print(p_pairs)
+  ggsave("pairs_plot.jpg", 
+        p_pairs, 
+        width = 20, 
+        height = 20, 
+        dpi = 300)
+}
+
+create_resid_fitted_plot(y_hat, e_hat)
+create_qq_plot(e_hat)
+# create_pairs_plot(RHP_FB0)
 ```
 
 ## Variable transformation
 ```{r}
-summary(powerTransform(cbind(RHP_FB0[,4:15])))
+summary(powerTransform(cbind(RHP_FB0[,15])))
 ```
 
 ```{r}
-# Transform our response variable and do another filter for release pos z (due to special case of a person's pitch specialty of throwing ball as low as possible)
+# Transform our response variable and do another filter for release pos z (due to special case of a person's (Adam Cimber) pitch specialty of throwing ball as low as possible)
 RHP_FB0 <- RHP_FB0 |> 
-        mutate(whiff = whiff^(1/3)) |> 
+        mutate(whiff = whiff^(1/2)) |> 
         filter(release_pos_z > 5)
+responses <- RHP_FB0$whiff
 
 # Rebuild our model with transformed data
 fb_model <- lm(whiff ~ 
@@ -300,23 +314,12 @@ y_hat <- fitted(fb_model)
 ```
 
 ```{r}
+# Response variable distribution of transformed data
+create_response_hist(responses)
+# Residuals vs fitted values for model with transformed data
+create_resid_fitted_plot(y_hat, e_hat)
 # QQ-plot for model with transformed data
-p_qq <- ggplot(data.frame(residuals = e_hat), aes(sample = residuals)) +
-  stat_qq(alpha = 0.6, color = "#2c3e50", size = 1.5) +
-  stat_qq_line(color = "#e74c3c") +
-  labs(title = "Normal Q-Q Plot",
-       x = "Theoretical Quantiles",
-       y = "Sample Quantiles") +
-  theme
-
-print(p_qq)
-
-# gsave("qq_plot.jpg", 
-#        p_qq, 
-#        width = 8, 
-#        height = 6, 
-#        dpi = 300)
-
+create_qq_plot(e_hat)
 ```
 
 ## Task 3: Initial Model Diagnostics and Analysis
@@ -333,7 +336,7 @@ print(p_qq)
 summary(fb_model)
 ```
 
-We immediately see that the *Adjusted R-squared* is 0.2233, and the *p-value* is \<2.2e-16, which is promising.
+We immediately see that the *Adjusted R-squared* is 0.5145, and the *p-value* is \< 2.2e-16, which is promising.
 
 We see that some predictors had high p-values—we delve into this later.
 
@@ -342,17 +345,6 @@ We see that some predictors had high p-values—we delve into this later.
 pairs(RHP_FB0[,4:15])
 ```
 
-Description
-
-Description
-
-Description
-
-Description
-
-Description
-```{r}
-```
 ```{r}
 di <- cooks.distance(fb_model)
 cutoff_di <- qf(0.5, 16, 1543)
@@ -377,10 +369,6 @@ print(RHP_FB0[RHP_FB0$release_pos_z < 6,])
 
 
 ```{r}
-```
-
-
-```{r}
 hist(RHP_FB0$release_speed)
 hist(RHP_FB0$release_spin_rate)
 hist(RHP_FB0$release_extension)
@@ -392,8 +380,6 @@ hist(RHP_FB0$whiff)
 ```
 
 ```{r}
-# Create Residual plots
-
 # Residual vs Fitted plot
 y_hat <- fitted(fb_model)
 e_hat <- resid(fb_model)
@@ -480,43 +466,6 @@ plot(RHP_FB0$pfx_x, e_hat, main="Residuals vs Pfx X", xlab="Pfx X", ylab="Residu
 plot(RHP_FB0$pfx_z, e_hat, main="Residuals vs Pfx Z", xlab="Pfx Z", ylab="Residuals")
 ```
 
-Description
-
-Description
-
-Description
-
-Description
-
-Description
-```{r}
-```
-
-
-```{r}
-# Create Box Plots
-# boxplot(e_hat ~ RHP_FB0$release_speed, main="Residuals vs Release Speed", xlab="Release Speed", ylab="Residuals")
-# boxplot(e_hat ~ RHP_FB0$release_spin_rate, main="Residuals vs Release Spin Rate", xlab="Release Spin Rate", ylab="Residuals")
-# boxplot(e_hat ~ RHP_FB0$release_extension, main="Residuals vs Release Extension", xlab="Release Extension", ylab="Residuals")
-# boxplot(e_hat ~ RHP_FB0$release_pos_z, main="Residuals vs Release Pos Z", xlab="Release Pos Z", ylab="Residuals")
-# boxplot(e_hat ~ RHP_FB0$release_pos_x, main="Residuals vs Release Pos X", xlab="Release Pos X", ylab="Residuals")
-# boxplot(e_hat ~ RHP_FB0$plate_z, main="Residuals vs Plate Z", xlab="Plate Z", ylab="Residuals")
-# boxplot(e_hat ~ RHP_FB0$plate_x, main="Residuals vs Plate X", xlab="Plate X", ylab="Residuals")
-# boxplot(e_hat ~ RHP_FB0$ax, main="Residuals vs Ax", xlab="Ax", ylab="Residuals")
-# boxplot(e_hat ~ RHP_FB0$az, main="Residuals vs Az", xlab="Az", ylab="Residuals")
-# boxplot(e_hat ~ RHP_FB0$pfx_x, main="Residuals vs Pfx X", xlab="Pfx X", ylab="Residuals")
-# boxplot(e_hat ~ RHP_FB0$pfx_z, main="Residuals vs Pfx Z", xlab="Pfx Z", ylab="Residuals")
-```
-
-Description
-
-Description
-
-Description
-
-Description
-
-Description
 
 ```{r}
 # Create QQ plot
@@ -526,13 +475,6 @@ qqline(e_hat)
 
 Description
 
-Description
-
-Description
-
-Description
-
-Description
 
 Earlier, we noticed that some predictors appeared to be statistically insignificant—*release_pos_x* and *ax*.
 
@@ -543,7 +485,7 @@ Before outright removing these predictors, we suspect that this may be due to mu
 vif(fb_model)
 ```
 
-Here, we see a high (\>10) inflation factor(s) for *stand*, *release_speed*, *az*, *ax*, *pfx_x*, *pfx_z*, *stand:release_pos_x*, *plate_x*. This hints that these variables may be collinear with *release_pos_x* and *ax*. However, *release_pos_x* did not have a high inflation factor. Also, we have observed an exceptionally high p-value of *release_pos_x*—0.881024—earlier. *release_pos_x* also had a very small coefficient estimate. These may be an implication that it is an insignificant variable. We perform an ANOVA test to verify this.
+Here, we see a high (\>10) inflation factor(s) for *stand*, *release_speed*, *az*, *ax*, *pfx_x*, *pfx_z*, *stand:release_pos_x*, *plate_x*. This hints that these variables may be collinear with *release_pos_x* and *ax*. However, *release_pos_x* did not have a high inflation factor. Also, we have observed an exceptionally high p-value of *release_pos_x*—0.364—earlier. *release_pos_x* also had a very small coefficient estimate. These may be an implication that it is an insignificant variable. We perform an ANOVA test to verify this.
 
 ```{r}
 # Fit temporary model without release_pos_x
@@ -554,7 +496,18 @@ fb_model_temp <- lm(whiff ~
                  ax + az + pfx_x + pfx_z + 
                  stand:ax + stand:plate_x,
                data = RHP_FB0, weights = count)
+e_hat_temp <- resid(fb_model_temp) 
+y_hat_temp <- fitted(fb_model_temp) 
+```
 
+```{r}
+# Check for any assumptions violated
+create_resid_fitted_plot(y_hat_temp, e_hat_temp)
+create_qq_plot(e_hat_temp)
+```
+
+Slight deviation on the left side of the QQ-plot, but is not significant enough. Slight fanning pattern can be seen, but is also not significant enough to pose issue. 
+```{r}
 # Perform ANOVA test
 anova(fb_model_temp, fb_model)
 ```
@@ -573,12 +526,26 @@ fb_model_temp <- lm(whiff ~
                  stand:ax + stand:plate_x,
                data = RHP_FB0, weights = count)
 
+e_hat_temp <- resid(fb_model_temp) 
+y_hat_temp <- fitted(fb_model_temp) 
 # coefficients, correlation, and statistical significance
 summary(fb_model_temp)
+```
 
+```{r}
+# Check for any assumptions violated
+create_resid_fitted_plot(y_hat_temp, e_hat_temp)
+create_qq_plot(e_hat_temp)
+```
+
+No significant violations detected. 
+
+```{r}
 # Perform VIF test
 vif(fb_model_temp)
+
 ```
+
 
 As anticipated, without *stand:release_pos_x*, *release_pos_x* has an exceptionally low p-value, and a substantially increased coefficient estimate. The inflation factor of *stand* is also decreased significantly.
 
@@ -599,15 +566,29 @@ fb_model_temp <- lm(whiff ~
                  release_pos_x + stand:plate_x + stand:ax,
                data = RHP_FB0, weights = count)
 
+e_hat_temp <- resid(fb_model_temp) 
+y_hat_temp <- fitted(fb_model_temp) 
 # coefficients, correlation, and statistical significance
 summary(fb_model_temp)
+```
 
+```{r}
+# Check for any assumptions violated
+create_resid_fitted_plot(y_hat_temp, e_hat_temp)
+create_qq_plot(e_hat_temp)
+```
+
+No major violations detected. 
+
+```{r}
 # Perform VIF test
 vif(fb_model_temp)
 
 # Perform Partial F test
 anova(fb_model_temp, fb_model)
+
 ```
+
 
 After removing *pfx_x* and *pfx_z*, we can observe that the p-values of *ax* and *az* have decreased. Also, the VIF of *ax* and *az* have also decreased significantly.
 
@@ -628,15 +609,12 @@ rm(fb_model_temp)
 # Residual vs Fitted plot
 y_hat <- fitted(fb_model_updated)
 e_hat <- resid(fb_model_updated)
-plot(x = y_hat, y = e_hat, main = "Residual vs Fitted", xlab = "Fitted", ylab = "Residuals")
-
+create_resid_fitted_plot(y_hat, e_hat)
 # Create QQ plot
-qqnorm(e_hat)
-qqline(e_hat)
+create_qq_plot(e_hat)
 
 # Create condition 2 plot
-pairs(RHP_FB0[, setdiff(colnames(RHP_FB0)[4:15], c("release_pos_x", "pfx_x", "pfx_z"))])
-
+create_pairs_plot(RHP_FB0)
 ```
 
 Description
@@ -695,23 +673,25 @@ ggplot(Final, aes(x = est_whiff, y = whiff)) +
     x = "Estimated Whiff Rate (Predicted)",
     y = "Actual Whiff Rate"
   ) +
-  theme_minimal(base_size = 15) +
-  theme(
-    plot.title = element_text(hjust = 0.5, face = "bold"),
-    axis.title.x = element_text(margin = margin(t = 10)),
-    axis.title.y = element_text(margin = margin(r = 10)),
-    panel.grid.major = element_line(color = "grey90"),
-    panel.grid.minor = element_blank()
-  )
+  theme
 ```
 
 ```{r}
+y_hat <- resid(Final_lm)
+e_hat <- fitted(Final_lm)
 # Residual vs Fitted plot
-y_hat <- fitted(Final_lm)
-e_hat <- resid(Final_lm)
-plot(x = y_hat, y = e_hat, main = "Residual vs Fitted", xlab = "Fitted", ylab = "Residuals")
-
+create_resid_fitted_plot(y_hat, e_hat)
 # Create QQ plot
-qqnorm(e_hat)
-qqline(e_hat)
+create_qq_plot(e_hat)
+```
+
+## Analysis on left-handed pitcher
+
+```{r}
+# Filter data for left-handed pitchers (LHP) and four-seam fastballs (FF)
+# Filter for all swings and calculate whiff rates
+RHP_FB <- savant_data |>
+  filter(p_throws == "R", pitch_type == "FF",
+         description %in% c("hit_into_play", "swinging_strike", "foul", "foul_tip")) |>
+  mutate(whiff = if_else(description == "swinging_strike", 1, 0))
 ```
